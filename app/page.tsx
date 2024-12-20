@@ -1,101 +1,169 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import ItemInput from "../components/ItemInput";
+import ComparisonCard from "../components/ComparisonCard";
+import ResultsDisplay from "../components/ResultsDisplay";
+import TiebreakerCard from "../components/TiebreakerCard";
+import NavigationBar from "@/components/NavigationBar";
+
+interface ItemScore {
+  item: string;
+  score: number;
+  nrOfAppearances: number;
+}
+
+const getRandomInt = (max: number) => {
+  return Math.floor(Math.random() * max);
+};
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+  const [items, setItems] = useState<ItemScore[]>([]);
+  const [currentPair, setCurrentPair] = useState<[string, string] | null>(null);
+  const [isSelectionComplete, setIsSelectionComplete] = useState(false);
+  const [tiedItems, setTiedItems] = useState<string[]>([]);
+  const [isTiebreakerComplete, setIsTiebreakerComplete] = useState(false);
+
+  useEffect(() => {
+    const itemsParam = searchParams.get("items");
+    if (itemsParam) {
+      const decodedItems = decodeURIComponent(itemsParam).split(",");
+      startTournament(decodedItems);
+    }
+  }, []);
+
+  const updateURL = (updatedItems: ItemScore[]) => {
+    const itemsString = updatedItems
+      .map((item) => `${item.item}:${item.score}:${item.nrOfAppearances}`)
+      .join(",");
+    // TODO: do url update without router
+    router.push(`?items=${encodeURIComponent(itemsString)}`);
+  };
+
+  const startTournament = (inputItems: string[]) => {
+    if (inputItems.length < 2) {
+      alert("Please enter at least two items to compare.");
+      return;
+    }
+    const initialItems = inputItems.map((item) => {
+      const [itemName, score, nrOfAppearances] = item.split(":");
+      return {
+        item: itemName,
+        score: parseInt(score) || 0,
+        nrOfAppearances: parseInt(nrOfAppearances) || 0,
+      };
+    });
+    setItems(shuffleArray(initialItems));
+    setIsSelectionComplete(false);
+    setIsTiebreakerComplete(false);
+    updateURL(initialItems);
+  };
+
+  // TODO: check if the shuffle could be done better
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+  };
+
+  // TODO: change this, it does not need to be a use effect
+  useEffect(() => {
+    if (items.length > 0 && !isSelectionComplete) {
+      getNextPair();
+    }
+  }, [items, isSelectionComplete]);
+
+  const getNextPair = () => {
+    const availableItems = items.filter((item) => item.nrOfAppearances < 2);
+    if (availableItems.length === 1) {
+      // only one item left, take a random item and add it so it can be compared
+      const finishedItems = items.filter(
+        (item) => item.item != availableItems[0].item
+      );
+
+      availableItems.push(
+        finishedItems[getRandomInt(finishedItems.length - 1)]
+      );
+    } else if (availableItems.length === 0) {
+      setIsSelectionComplete(true);
+      checkForTies();
+      return;
+    }
+    const [item1, item2] = availableItems.slice(0, 2);
+    setCurrentPair([item1.item, item2.item]);
+  };
+
+  const selectItem = (selectedItem: string) => {
+    setItems((prevItems) => {
+      const updatedItems = prevItems.map((item) => {
+        if (item.item === selectedItem) {
+          return {
+            ...item,
+            score: item.score + 1,
+            nrOfAppearances: item.nrOfAppearances + 1,
+          };
+        }
+        if (currentPair && currentPair.includes(item.item)) {
+          return { ...item, nrOfAppearances: item.nrOfAppearances + 1 };
+        }
+        return item;
+      });
+      const shuffledItems = shuffleArray(updatedItems);
+      updateURL(shuffledItems);
+      return shuffledItems;
+    });
+  };
+
+  const checkForTies = () => {
+    const sortedItems = [...items].sort((a, b) => b.score - a.score);
+    const highestScore = sortedItems[0].score;
+    const tiedItems = sortedItems.filter((item) => item.score === highestScore);
+
+    if (tiedItems.length > 1) {
+      setTiedItems(tiedItems.map((item) => item.item));
+    } else {
+      setIsTiebreakerComplete(true);
+    }
+  };
+
+  const selectTiebreakerWinner = (winner: string) => {
+    setItems((prevItems) => {
+      const updatedItems = prevItems.map((item) =>
+        item.item === winner ? { ...item, score: item.score + 1 } : item
+      );
+      updateURL(updatedItems);
+      return updatedItems;
+    });
+    setTiedItems([]);
+    setIsTiebreakerComplete(true);
+  };
+
+  return (
+    <>
+      <NavigationBar />
+      <main className="flex gap-10 min-h-full flex-col items-center justify-center p-4">
+        {items.length === 0 && <ItemInput onSubmit={startTournament} />}
+        {currentPair && !isSelectionComplete && (
+          <ComparisonCard
+            item1={currentPair[0]}
+            item2={currentPair[1]}
+            onSelect={selectItem}
+          />
+        )}
+        {isSelectionComplete && tiedItems.length > 0 && (
+          <TiebreakerCard items={tiedItems} onSelect={selectTiebreakerWinner} />
+        )}
+        {isSelectionComplete && isTiebreakerComplete && (
+          <ResultsDisplay items={items} />
+        )}
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+    </>
   );
 }
