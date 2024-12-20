@@ -45,7 +45,7 @@ export default function NavigationBar() {
   return (
     <nav className="flex flex-wrap justify-between m-3">
       <h1 className="text-4xl font-bold mb-8">
-        <a href="/">Pick A Favourite</a>
+        <a href="./">Pick A Favourite</a>
       </h1>
       <Button
         onClick={() => {
