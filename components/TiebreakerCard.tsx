@@ -13,7 +13,7 @@ export default function TiebreakerCard({
     <div className="w-full max-w-2xl">
       <h2 className="text-2xl font-bold mb-4">Tiebreaker Round</h2>
       <p className="mb-4">Please select your favorite from these top items:</p>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="flex flex-wrap">
         {items.map((item, index) => (
           <Card
             key={index}

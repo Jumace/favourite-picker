@@ -40,7 +40,7 @@ export default function ItemInput({ onSubmit }: ItemInputProps) {
           rows={10}
         />
         <Button type="submit" className="w-full">
-          Start Picking a Favourite
+          Start
         </Button>
       </form>
     </div>
