@@ -1,0 +1,3 @@
+# Glossary
+
+PR: Pull Request
